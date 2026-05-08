@@ -9,6 +9,7 @@ import { useDocxParser } from '~~/composables/useDocxParser'
 import { useHeuristicScanner } from '~~/composables/useHeuristicScanner'
 import { useI18n } from '~~/composables/useI18n'
 import { useLocalClassifierModel } from '~~/composables/useLocalClassifierModel'
+import { deriveSuggestedAnswers } from '~~/lib/classification/suggested-answers'
 import type {
   AnalysisChunk,
   ClassificationLabel,
@@ -108,13 +109,10 @@ const handleUpload = async (file: File) => {
     excerpt.value = scanResult.excerpt
     modelChunks.value = scanResult.chunks
 
-    answers.officialMarking = parsed.extractedMarkings[0] ?? 'unknown'
-    answers.nonNationalImpact = signals.value.some((signal) => signal.severityHint === 'serious') ? 'serious' : 'injury'
-    answers.nationalInterestImpact = signals.value.some((signal) => signal.severityHint.startsWith('national_'))
-      ? 'national_injury'
-      : 'none'
-    answers.aggregationRisk = signals.value.length >= 4 ? 'yes' : 'possible'
-    answers.distributionScope = parsed.extractedMarkings.includes('Public') ? 'public_release' : 'internal_limited'
+    const suggestedAnswers = deriveSuggestedAnswers(parsed, signals.value)
+    for (const key of Object.keys(suggestedAnswers)) {
+      answers[key] = suggestedAnswers[key]
+    }
   } catch (caught) {
     documentResult.value = null
     signals.value = []
@@ -242,15 +240,20 @@ watch(
         </div>
 
         <div class="flex flex-col items-start gap-4 lg:items-end">
-          <LanguageToggle v-model="locale" />
+          <div class="flex flex-wrap items-center gap-3">
+            <UButton to="/benchmarks" color="neutral" variant="outline" size="sm">
+              {{ locale === 'fr' ? 'Voir les références' : 'View benchmarks' }}
+            </UButton>
+            <LanguageToggle v-model="locale" />
+          </div>
 
-          <div class="panel-shell w-full max-w-md rounded-[1.3rem] p-5 lg:p-6">
+          <div class="panel-shell w-full max-w-md p-5 lg:p-6">
             <div class="flex items-center justify-between text-sm text-slate-300">
               <span>{{ scanState }}</span>
               <span>{{ progress }}%</span>
             </div>
-            <div class="mt-3 h-2 overflow-hidden rounded-full bg-white/7">
-              <div class="h-full rounded-full bg-amber-400 transition-all duration-500" :style="{ width: `${progress}%` }" />
+            <div class="mt-3 h-2 overflow-hidden bg-white/7">
+              <div class="h-full bg-amber-400 transition-all duration-500" :style="{ width: `${progress}%` }" />
             </div>
             <p class="mt-4 text-sm text-slate-400">
               {{ modelStatus === 'ready'
@@ -259,6 +262,16 @@ watch(
                   ? (locale === 'fr' ? 'Amélioration locale en cours en arrière-plan.' : 'Local enhancement is running in the background.')
                   : (locale === 'fr' ? 'Le moteur à règles peut terminer le flux sans attendre le modèle local.' : 'The rules engine can complete the workflow without waiting for the local model.') }}
             </p>
+            <div class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <div class="console-stat p-3">
+                <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Mode' : 'Mode' }}</p>
+                <p class="mt-1 text-slate-100">{{ locale === 'fr' ? 'Flux d’examen' : 'Review workflow' }}</p>
+              </div>
+              <div class="console-stat p-3">
+                <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Sortie' : 'Output' }}</p>
+                <p class="mt-1 text-slate-100">{{ locale === 'fr' ? 'Rapport bilingue' : 'Bilingual report' }}</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -312,7 +325,7 @@ watch(
       </div>
 
       <section v-if="report" class="print-report hidden pt-10">
-        <div class="mx-auto max-w-4xl rounded-[1.4rem] border border-slate-200 bg-white p-10 shadow-xl">
+        <div class="mx-auto max-w-4xl border border-slate-200 bg-white p-10 shadow-xl">
           <p class="data-kicker text-slate-500">{{ t('reportSummary') }}</p>
           <div class="mt-4 flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -321,7 +334,7 @@ watch(
                 {{ t('reportGenerated') }} {{ new Date(report.generatedAt).toLocaleString(locale === 'fr' ? 'fr-CA' : 'en-CA') }}
               </p>
             </div>
-            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <div class="border border-amber-200 bg-amber-50 px-5 py-4">
               <p class="text-xs uppercase tracking-[0.18em] text-amber-800">
                 {{ locale === 'fr' ? 'Niveau final' : 'Final label' }}
               </p>

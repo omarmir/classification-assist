@@ -18,7 +18,7 @@ const handleFiles = (files: FileList | null) => {
 
 <template>
   <section
-    class="panel-shell rounded-[1.4rem] p-6 md:p-7"
+    class="panel-shell p-6 md:p-7"
     :class="isDragging ? 'border-amber-300/55 bg-amber-500/8' : ''"
     @dragenter.prevent="isDragging = true"
     @dragover.prevent="isDragging = true"
@@ -43,7 +43,7 @@ const handleFiles = (files: FileList | null) => {
       </UButton>
     </div>
 
-    <div class="mt-8 rounded-[1.2rem] border border-dashed border-white/12 bg-white/4 px-5 py-10 text-center">
+    <div class="mt-8 border border-dashed border-white/12 bg-white/4 px-5 py-10 text-center">
       <p class="text-base font-medium text-slate-100">Drop a file here or use the button above.</p>
       <p class="mt-2 text-sm text-slate-400">Legacy `.doc` files, encrypted files, and scanned image-only documents are not supported in v1.</p>
     </div>

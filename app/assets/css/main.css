@@ -23,7 +23,7 @@
   --ui-bg: #07111f;
   --ui-text: #ecf3fb;
   --ui-primary: var(--ui-color-amber-500);
-  --ui-radius: 0.85rem;
+  --ui-radius: 0.18rem;
   --ui-container: 88rem;
 }
 
@@ -59,7 +59,7 @@ body::before {
 .panel-shell {
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: linear-gradient(180deg, rgba(10, 18, 32, 0.92), rgba(6, 13, 24, 0.96));
-  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.22);
+  box-shadow: none;
 }
 
 .panel-accent {
@@ -92,13 +92,13 @@ body::before {
   background: rgba(15, 23, 42, 0.72);
   padding: 0.4rem 0.7rem;
   font-size: 0.82rem;
+  border-radius: 2px;
 }
 
 .signal-pill::before {
   content: "";
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
+  width: 0.55rem;
+  height: 1px;
   background: rgba(251, 191, 36, 0.95);
 }
 
@@ -113,7 +113,12 @@ body::before {
 }
 
 .step-chip:hover {
-  transform: translateY(-1px);
+  transform: translateX(2px);
+}
+
+.console-stat {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .fade-rise-enter-active,
