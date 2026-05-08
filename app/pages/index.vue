@@ -226,55 +226,98 @@ watch(
 </script>
 
 <template>
-  <main class="px-4 py-5 md:px-6 lg:px-8">
-    <div class="mx-auto max-w-[88rem]">
-      <section class="no-print grid gap-8 pb-8 pt-4 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-        <div>
-          <p class="data-kicker text-amber-300/80">{{ t('appTitle') }}</p>
-          <h1 class="mt-4 max-w-3xl text-[clamp(2.8rem,7vw,5.5rem)] font-semibold leading-[0.94] tracking-[-0.05em] text-white">
-            {{ locale === 'fr' ? 'Classer sans quitter le navigateur.' : 'Classify without leaving the browser.' }}
-          </h1>
-          <p class="mt-4 max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-            {{ t('appSubtitle') }}
-          </p>
-        </div>
-
-        <div class="flex flex-col items-start gap-4 lg:items-end">
-          <div class="flex flex-wrap items-center gap-3">
-            <UButton to="/benchmarks" color="neutral" variant="outline" size="sm">
-              {{ locale === 'fr' ? 'Voir les références' : 'View benchmarks' }}
-            </UButton>
-            <LanguageToggle v-model="locale" />
-          </div>
-
-          <div class="panel-shell w-full max-w-md p-5 lg:p-6">
-            <div class="flex items-center justify-between text-sm text-slate-300">
-              <span>{{ scanState }}</span>
-              <span>{{ progress }}%</span>
-            </div>
-            <div class="mt-3 h-2 overflow-hidden bg-white/7">
-              <div class="h-full bg-amber-400 transition-all duration-500" :style="{ width: `${progress}%` }" />
-            </div>
-            <p class="mt-4 text-sm text-slate-400">
-              {{ modelStatus === 'ready'
-                ? (locale === 'fr' ? 'Modèle local disponible.' : 'Local model available.')
-                : modelStatus === 'loading'
-                  ? (locale === 'fr' ? 'Amélioration locale en cours en arrière-plan.' : 'Local enhancement is running in the background.')
-                  : (locale === 'fr' ? 'Le moteur à règles peut terminer le flux sans attendre le modèle local.' : 'The rules engine can complete the workflow without waiting for the local model.') }}
-            </p>
-            <div class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div class="console-stat p-3">
-                <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Mode' : 'Mode' }}</p>
-                <p class="mt-1 text-slate-100">{{ locale === 'fr' ? 'Flux d’examen' : 'Review workflow' }}</p>
+  <div class="min-h-screen bg-slate-100 text-slate-900">
+    <header class="no-print border-t-[14px] border-blue-800 bg-white">
+      <div class="border-b border-slate-300">
+        <div class="mx-auto flex max-w-[88rem] flex-col gap-5 px-4 py-7 sm:px-6 lg:px-8">
+          <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div class="max-w-3xl">
+              <p class="data-kicker text-slate-500">{{ t('appTitle') }}</p>
+              <h1 class="mt-2 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+                {{ locale === 'fr' ? 'Classer sans quitter le navigateur.' : 'Classify without leaving the browser.' }}
+              </h1>
+              <p class="mt-4 max-w-3xl text-base leading-7 text-slate-700">
+                {{ t('appSubtitle') }}
+              </p>
+              <div class="mt-5 flex flex-wrap items-center gap-3">
+                <UButton to="/benchmarks" color="neutral" variant="outline" size="sm">
+                  {{ locale === 'fr' ? 'Voir les références' : 'View benchmarks' }}
+                </UButton>
+                <LanguageToggle v-model="locale" />
               </div>
-              <div class="console-stat p-3">
-                <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Sortie' : 'Output' }}</p>
-                <p class="mt-1 text-slate-100">{{ locale === 'fr' ? 'Rapport bilingue' : 'Bilingual report' }}</p>
-              </div>
+            </div>
+
+            <div class="max-w-sm border-l-4 border-blue-800 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
+              <p class="font-semibold text-slate-950">{{ locale === 'fr' ? 'Mode de traitement' : 'Operating mode' }}</p>
+              <p>{{ locale === 'fr' ? 'Le moteur à règles peut terminer le flux sans attendre le modèle local.' : 'The rules engine can complete the workflow without waiting for the local model.' }}</p>
+              <p class="mt-3 font-semibold text-slate-950">{{ locale === 'fr' ? 'Modèle local' : 'Local model' }}</p>
+              <p>
+                {{ modelStatus === 'ready'
+                  ? (locale === 'fr' ? 'Disponible pour améliorer les notes de preuve.' : 'Ready to enhance evidence notes.')
+                  : modelStatus === 'loading'
+                    ? (locale === 'fr' ? 'Chargement en arrière-plan.' : 'Loading in the background.')
+                    : (locale === 'fr' ? 'Facultatif pour cette version.' : 'Optional for this workflow.') }}
+              </p>
             </div>
           </div>
         </div>
-      </section>
+      </div>
+      <div class="border-b border-slate-300 bg-slate-50">
+        <div class="mx-auto grid max-w-[88rem] gap-4 px-4 py-4 sm:px-6 md:grid-cols-3 lg:px-8">
+          <div class="border-l-4 border-blue-800 bg-white px-4 py-3">
+            <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Étape 1' : 'Step 1' }}</p>
+            <p class="mt-1 text-sm font-semibold text-slate-950">{{ locale === 'fr' ? 'Téléversement et extraction' : 'Upload and extraction' }}</p>
+          </div>
+          <div class="border-l-4 border-slate-400 bg-white px-4 py-3">
+            <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Étape 2' : 'Step 2' }}</p>
+            <p class="mt-1 text-sm font-semibold text-slate-950">{{ locale === 'fr' ? 'Questions du réviseur' : 'Reviewer questions' }}</p>
+          </div>
+          <div class="border-l-4 border-amber-500 bg-white px-4 py-3">
+            <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Sortie' : 'Output' }}</p>
+            <p class="mt-1 text-sm font-semibold text-slate-950">{{ locale === 'fr' ? 'Recommandation bilingue' : 'Bilingual recommendation' }}</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="px-4 py-8 md:px-6 lg:px-8">
+      <div class="mx-auto max-w-[88rem]">
+        <section class="no-print mb-6 grid gap-4 lg:grid-cols-[1fr_25rem]">
+          <div class="border border-slate-400 bg-white">
+            <div class="section-heading">
+              <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'État' : 'Status' }}</p>
+              <h2 class="mt-1 text-xl font-semibold text-slate-950">{{ scanState }}</h2>
+            </div>
+            <div class="px-6 py-5">
+              <div class="flex items-center justify-between text-sm text-slate-700">
+                <span>{{ locale === 'fr' ? 'Progression du flux' : 'Workflow progress' }}</span>
+                <span class="font-semibold text-slate-950">{{ progress }}%</span>
+              </div>
+              <div class="model-progress mt-3">
+                <div class="h-full bg-blue-800 transition-all duration-500" :style="{ width: `${progress}%` }" />
+              </div>
+            </div>
+          </div>
+
+          <div class="border border-slate-400 bg-white">
+            <div class="section-heading">
+              <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Inférence' : 'Inference' }}</p>
+              <h2 class="mt-1 text-xl font-semibold text-slate-950">{{ locale === 'fr' ? 'Modèle local' : 'Local model' }}</h2>
+            </div>
+            <div class="space-y-3 px-6 py-5 text-sm text-slate-700">
+              <div class="flex items-center justify-between gap-3">
+                <span>{{ modelStatus }}</span>
+                <UBadge :color="modelStatus === 'ready' ? 'success' : modelStatus === 'loading' ? 'warning' : modelStatus === 'fallback' ? 'error' : 'neutral'" variant="subtle">
+                  {{ modelStatus === 'ready' ? 'Ready' : modelStatus === 'loading' ? 'Loading' : modelStatus === 'fallback' ? 'Fallback' : 'Pending' }}
+                </UBadge>
+              </div>
+              <div class="model-progress">
+                <div class="h-full bg-blue-800 transition-all duration-500" :style="{ width: modelStatus === 'ready' ? '100%' : modelStatus === 'loading' ? '62%' : '0%' }" />
+              </div>
+              <p>{{ locale === 'fr' ? 'La recommandation initiale reste disponible pendant le chargement.' : 'The initial recommendation remains available while the model loads.' }}</p>
+            </div>
+          </div>
+        </section>
 
       <div class="no-print grid gap-6 xl:grid-cols-[1.06fr_0.94fr]">
         <div class="space-y-6">
@@ -377,6 +420,7 @@ watch(
           </div>
         </div>
       </section>
-    </div>
-  </main>
+      </div>
+    </main>
+  </div>
 </template>

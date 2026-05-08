@@ -15,8 +15,8 @@ const text = (entry: Record<SupportedLocale, string>) => entry[props.locale]
   <section class="panel-shell p-6 md:p-7">
     <div class="flex items-center justify-between gap-4">
       <div>
-        <p class="data-kicker text-slate-400">Reviewer questions</p>
-        <h2 class="mt-2 text-xl font-semibold text-white">Lock the injury threshold</h2>
+        <p class="data-kicker text-slate-500">Reviewer questions</p>
+        <h2 class="mt-2 text-xl font-semibold text-slate-950">Lock the injury threshold</h2>
       </div>
       <UBadge color="primary" variant="subtle">
         {{ Object.values(answers).filter(Boolean).length }}/{{ questionDefinitions.length }}
@@ -27,14 +27,14 @@ const text = (entry: Record<SupportedLocale, string>) => entry[props.locale]
       <article
         v-for="question in questionDefinitions"
         :key="question.key"
-        class="border border-white/8 bg-white/4 p-4"
+        class="border border-slate-300 bg-slate-50 p-4"
       >
-        <p class="text-sm font-semibold text-white">{{ text(question.title) }}</p>
-        <p class="mt-1 text-sm leading-6 text-slate-400">{{ text(question.help) }}</p>
+        <p class="text-sm font-semibold text-slate-950">{{ text(question.title) }}</p>
+        <p class="mt-1 text-sm leading-6 text-slate-700">{{ text(question.help) }}</p>
 
         <select
           v-model="answers[question.key]"
-          class="mt-4 w-full border border-white/10 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-amber-400/60"
+          class="mt-4 w-full border border-slate-400 bg-white px-3 py-3 text-sm text-slate-950 outline-none transition focus:border-blue-800"
         >
           <option disabled value="">
             {{ locale === 'fr' ? 'Sélectionner une réponse' : 'Select an answer' }}
