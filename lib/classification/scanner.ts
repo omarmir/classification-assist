@@ -164,8 +164,24 @@ export const scanDocument = (document: DocumentParseResult) => {
   }
 }
 
-const uniqueMatches = (text: string, pattern: RegExp, limit: number) =>
-  Array.from(new Set(Array.from(text.matchAll(pattern)).map((match) => match[0]))).slice(0, limit)
+const uniqueMatches = (text: string, pattern: RegExp, limit: number) => {
+  const matches = Array.from(text.matchAll(pattern))
+    .filter((match) => !isLocallyNegated(text, match.index ?? 0))
+    .map((match) => match[0])
+
+  return Array.from(new Set(matches)).slice(0, limit)
+}
+
+const isLocallyNegated = (text: string, index: number) => {
+  const sentenceStart = Math.max(
+    text.lastIndexOf('.', index),
+    text.lastIndexOf(';', index),
+    text.lastIndexOf('\n', index)
+  ) + 1
+  const prefix = text.slice(sentenceStart, index).toLowerCase()
+
+  return /\b(no|not|without|excludes?|aucun|aucune|sans)\b/.test(prefix)
+}
 
 const contextualMatches = (
   text: string,

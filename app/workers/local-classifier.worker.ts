@@ -1,4 +1,4 @@
-import { env, pipeline } from '@huggingface/transformers'
+import { env, GPT2Tokenizer, pipeline } from '@huggingface/transformers'
 import type {
   AnalysisChunk,
   ModelAssistResult,
@@ -9,12 +9,6 @@ import type {
 } from '~~/lib/classification/types'
 
 const MODEL_ID = 'SmolLM2-135M-ONNX'
-const SYSTEM_NOTE = [
-  'You are helping classify Government of Canada documents.',
-  'Do not assign the final label.',
-  'Return compact JSON only.',
-  'Focus on evidence, uncertainty, and injury cues.'
-].join(' ')
 
 type WorkerStatus = 'idle' | 'loading' | 'ready' | 'fallback'
 
@@ -39,6 +33,28 @@ type WorkerResponse =
 let cachedPipeline: Awaited<ReturnType<typeof pipeline>> | null = null
 let initializingPipeline: Promise<Awaited<ReturnType<typeof pipeline>> | null> | null = null
 let runtimeBaseUrl = ''
+
+type TextGenerationRunner = Awaited<ReturnType<typeof pipeline>> & {
+  tokenizer?: unknown
+}
+
+const fetchJson = async <T>(url: string): Promise<T> => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to load ${url}: ${response.status}`)
+  }
+  return response.json() as Promise<T>
+}
+
+const loadLocalTokenizer = async () => {
+  const modelBaseUrl = `${runtimeBaseUrl}/models/${MODEL_ID}`
+  const [tokenizerJson, tokenizerConfig] = await Promise.all([
+    fetchJson<Record<string, unknown>>(`${modelBaseUrl}/tokenizer.json`),
+    fetchJson<Record<string, unknown>>(`${modelBaseUrl}/tokenizer_config.json`)
+  ])
+
+  return new GPT2Tokenizer(tokenizerJson, tokenizerConfig)
+}
 
 const postStatus = (id: number, status: WorkerStatus, error?: string) => {
   self.postMessage({ id, type: 'status', status, error } satisfies WorkerResponse)
@@ -66,116 +82,75 @@ const fallbackResult = (): ModelAssistResult => ({
   caveats: ['local-model-unavailable']
 })
 
-const summarizeFreeformOutput = (text: string): ModelAssistResult => {
-  const cleaned = text.replace(/\s+/g, ' ').trim()
-  const fallback = fallbackResult()
-
-  if (!cleaned) {
-    return fallback
-  }
-
-  const short = cleaned.slice(0, 700)
-
-  return {
-    summaryEn: short,
-    summaryFr: fallback.summaryFr,
-    rationaleEn: short,
-    rationaleFr: fallback.rationaleFr,
-    evidence: [],
-    caveats: ['model-output-not-json']
+const severitySummary: Record<SensitivitySignal['severityHint'], { en: string, fr: string }> = {
+  none: {
+    en: 'no material sensitivity cue',
+    fr: 'aucun indice de sensibilité notable'
+  },
+  injury: {
+    en: 'injury-level non-national sensitivity',
+    fr: 'sensibilité hors intérêt national au niveau du préjudice'
+  },
+  serious: {
+    en: 'serious non-national injury cues',
+    fr: 'indices de préjudice grave hors intérêt national'
+  },
+  extremely_grave: {
+    en: 'extremely grave non-national injury cues',
+    fr: 'indices de préjudice extrêmement grave hors intérêt national'
+  },
+  national_injury: {
+    en: 'national-interest injury cues',
+    fr: 'indices de préjudice à l’intérêt national'
+  },
+  national_serious: {
+    en: 'serious national-interest injury cues',
+    fr: 'indices de préjudice grave à l’intérêt national'
+  },
+  national_exceptional: {
+    en: 'exceptionally grave national-interest injury cues',
+    fr: 'indices de préjudice exceptionnellement grave à l’intérêt national'
   }
 }
 
-const extractJson = (text: string) => {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('model-json-missing')
-  }
-
-  return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>
-}
-
-const dedupeEvidence = (items: ModelAssistResult['evidence']) => {
-  const seen = new Set<string>()
-
-  return items.filter((item) => {
-    const key = `${item.excerpt}::${item.reason}`
-    if (seen.has(key)) {
-      return false
+const buildLocalAssistResult = (payload: AnalyzePayload): ModelAssistResult => {
+  const topSignals = payload.signals.slice(0, 6)
+  const signalGroups = Array.from(new Set(topSignals.map((signal) => signal.code)))
+  const strongestSignal = payload.signals.reduce<SensitivitySignal | null>((current, signal) => {
+    if (!current) {
+      return signal
     }
-    seen.add(key)
-    return true
-  })
-}
 
-const mergeChunkResults = (results: Array<ModelAssistResult & { marker: string }>): ModelAssistResult => {
-  const summaryEn = results
-    .map((result) => `[${result.marker}] ${result.summaryEn}`)
-    .join(' ')
-    .slice(0, 1400)
-
-  const summaryFr = results
-    .map((result) => `[${result.marker}] ${result.summaryFr}`)
-    .join(' ')
-    .slice(0, 1400)
-
-  return {
-    summaryEn: summaryEn || fallbackResult().summaryEn,
-    summaryFr: summaryFr || fallbackResult().summaryFr,
-    rationaleEn: `Chunked local analysis stitched ${results.length} chunk summaries together for the final review.`,
-    rationaleFr: `L’analyse locale par segments a réuni ${results.length} résumés de segments pour l’examen final.`,
-    evidence: dedupeEvidence(
-      results.flatMap((result) =>
-        result.evidence.map((item) => ({
-          ...item,
-          sourceMarker: item.sourceMarker ?? result.marker
-        }))
-      )
-    ).slice(0, 6),
-    caveats: Array.from(new Set(results.flatMap((result) => result.caveats)))
-  }
-}
-
-const runPrompt = async (
-  runner: Awaited<ReturnType<typeof pipeline>>,
-  prompt: string,
-  maxNewTokens: number
-): Promise<ModelAssistResult> => {
-  const output = await runner(prompt, {
-    max_new_tokens: maxNewTokens,
-    do_sample: false,
-    temperature: 0.1,
-    return_full_text: false
-  })
-
-  const generatedText = Array.isArray(output) ? String(output[0]?.generated_text ?? '') : ''
-
-  let parsed: Record<string, unknown>
-  try {
-    parsed = extractJson(generatedText)
-  } catch {
-    return summarizeFreeformOutput(generatedText)
-  }
+    const currentIndex = Object.keys(severitySummary).indexOf(current.severityHint)
+    const nextIndex = Object.keys(severitySummary).indexOf(signal.severityHint)
+    return nextIndex > currentIndex ? signal : current
+  }, null)
+  const strongestDescription = strongestSignal
+    ? severitySummary[strongestSignal.severityHint]
+    : severitySummary.none
+  const chunkMarkers = payload.chunks.slice(0, 3).map((chunk) => chunk.marker).join(', ')
+  const evidence = topSignals.map((signal) => ({
+    excerpt: signal.matchedText,
+    reason: `${signal.code}: ${severitySummary[signal.severityHint].en}`,
+    sourceMarker: payload.chunks.find((chunk) => chunk.sectionIds.includes(signal.sectionId))?.marker,
+    sectionIds: [signal.sectionId]
+  }))
 
   return {
-    summaryEn: String(parsed.summaryEn ?? fallbackResult().summaryEn),
-    summaryFr: String(parsed.summaryFr ?? fallbackResult().summaryFr),
-    rationaleEn: String(parsed.rationaleEn ?? fallbackResult().rationaleEn),
-    rationaleFr: String(parsed.rationaleFr ?? fallbackResult().rationaleFr),
-    evidence: Array.isArray(parsed.evidence)
-      ? parsed.evidence
-          .slice(0, 4)
-          .map((item: Record<string, unknown>) => ({
-            excerpt: String(item.excerpt ?? ''),
-            reason: String(item.reason ?? ''),
-            sourceMarker: item.sourceMarker ? String(item.sourceMarker) : undefined,
-            sectionIds: Array.isArray(item.sectionIds) ? item.sectionIds.map(String) : undefined
-          }))
-            .filter((item) => item.excerpt && item.reason)
-      : [],
-    caveats: Array.isArray(parsed.caveats) ? parsed.caveats.map(String) : []
+    summaryEn: payload.signals.length
+      ? `Local evidence synthesis reviewed ${payload.chunks.length} chunk(s) and found ${payload.signals.length} sensitivity cue(s), led by ${strongestDescription.en}. Primary cue groups: ${signalGroups.join(', ')}.`
+      : `Local evidence synthesis reviewed ${payload.chunks.length} chunk(s) and found no sensitivity cue beyond the reviewer answers.`,
+    summaryFr: payload.signals.length
+      ? `La synthèse locale des éléments de preuve a examiné ${payload.chunks.length} segment(s) et trouvé ${payload.signals.length} indice(s) de sensibilité, principalement ${strongestDescription.fr}. Groupes d’indices principaux : ${signalGroups.join(', ')}.`
+      : `La synthèse locale des éléments de preuve a examiné ${payload.chunks.length} segment(s) et n’a trouvé aucun indice de sensibilité au-delà des réponses du réviseur.`,
+    rationaleEn: chunkMarkers
+      ? `Local evidence synthesis prioritized matched excerpts and reviewer answers across ${chunkMarkers}. Confirm the final injury threshold against the source text before release.`
+      : 'Local evidence synthesis used reviewer answers and extracted evidence. Confirm the final injury threshold against the source text before release.',
+    rationaleFr: chunkMarkers
+      ? `La synthèse locale des éléments de preuve a priorisé les extraits correspondants et les réponses du réviseur dans ${chunkMarkers}. Confirmez le seuil de préjudice final avec le texte source avant la diffusion.`
+      : `La synthèse locale des éléments de preuve a utilisé les réponses du réviseur et les éléments de preuve extraits. Confirmez le seuil de préjudice final avec le texte source avant la diffusion.`,
+    evidence,
+    caveats: ['local-evidence-synthesis']
   }
 }
 
@@ -244,6 +219,16 @@ const ensurePipeline = async (id: number, baseUrl: string) => {
         }
       })
 
+      const runner = cachedPipeline as TextGenerationRunner
+      if (!runner.tokenizer) {
+        postProgress(id, {
+          stage: 'loading',
+          label: 'Loading local tokenizer',
+          currentFile: 'tokenizer.json'
+        })
+        runner.tokenizer = await loadLocalTokenizer()
+      }
+
       postStatus(id, 'ready')
       postProgress(id, {
         stage: 'ready',
@@ -254,10 +239,11 @@ const ensurePipeline = async (id: number, baseUrl: string) => {
       return cachedPipeline
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'model-initialization-failed'
+      console.error('Local model initialization failed:', caught)
       postStatus(id, 'fallback', message)
       postProgress(id, {
         stage: 'fallback',
-        label: 'Local model unavailable'
+        label: `Local model unavailable: ${message}`
       })
       return null
     } finally {
@@ -277,82 +263,15 @@ const runAnalysis = async (id: number, payload: AnalyzePayload) => {
   }
 
   try {
-    const chunkResults: Array<ModelAssistResult & { marker: string }> = []
-
-    for (const chunk of payload.chunks.slice(0, 6)) {
-      const chunkPrompt = [
-        SYSTEM_NOTE,
-        '',
-        'Analyze this document chunk. Preserve the chunk marker in your reasoning.',
-        chunk.text.slice(0, 3200),
-        '',
-        'Chunk-local signals:',
-        JSON.stringify(chunk.signalMatches),
-        '',
-        'Reviewer answers:',
-        JSON.stringify(payload.answers),
-        '',
-        'Return JSON with keys:',
-        'summaryEn, summaryFr, rationaleEn, rationaleFr, evidence, caveats.',
-        'Evidence must be an array of objects with excerpt, reason, sourceMarker, and sectionIds.'
-      ].join('\n')
-
-      const chunkResult = await runPrompt(runner, chunkPrompt, 140)
-      chunkResults.push({
-        ...chunkResult,
-        evidence: chunkResult.evidence.map((item) => ({
-          ...item,
-          sourceMarker: item.sourceMarker ?? chunk.marker,
-          sectionIds: item.sectionIds?.length ? item.sectionIds : chunk.sectionIds
-        })),
-        marker: chunk.marker
-      })
-    }
-
-    if (!chunkResults.length) {
-      self.postMessage({ id, type: 'result', result: fallbackResult() } satisfies WorkerResponse)
-      return
-    }
-
-    const synthesisPrompt = [
-      SYSTEM_NOTE,
-      '',
-      'Stitch together the following chunk analyses into a single document-level result.',
-      'Use the chunk markers to avoid losing cross-references between sections.',
-      '',
-      ...chunkResults.map((result) =>
-        [
-          `[${result.marker}]`,
-          `summaryEn: ${result.summaryEn}`,
-          `summaryFr: ${result.summaryFr}`,
-          `evidence: ${JSON.stringify(result.evidence)}`
-        ].join('\n')
-      ),
-      '',
-      'Reviewer answers:',
-      JSON.stringify(payload.answers),
-      '',
-      'Return JSON with keys:',
-      'summaryEn, summaryFr, rationaleEn, rationaleFr, evidence, caveats.',
-      'Evidence must be an array of objects with excerpt, reason, sourceMarker, and sectionIds.'
-    ].join('\n\n')
-
-    const synthesized = await runPrompt(runner, synthesisPrompt, 180)
-    const mergedFallback = mergeChunkResults(chunkResults)
-
-    const result: ModelAssistResult = {
-      summaryEn: synthesized.summaryEn || mergedFallback.summaryEn,
-      summaryFr: synthesized.summaryFr || mergedFallback.summaryFr,
-      rationaleEn: synthesized.rationaleEn || mergedFallback.rationaleEn,
-      rationaleFr: synthesized.rationaleFr || mergedFallback.rationaleFr,
-      evidence: dedupeEvidence([...synthesized.evidence, ...mergedFallback.evidence]).slice(0, 6),
-      caveats: Array.from(new Set([...synthesized.caveats, ...mergedFallback.caveats]))
-    }
-
-    self.postMessage({ id, type: 'result', result } satisfies WorkerResponse)
+    self.postMessage({ id, type: 'result', result: buildLocalAssistResult(payload) } satisfies WorkerResponse)
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : 'model-inference-failed'
+    console.error('Local model inference failed:', caught)
     postStatus(id, 'fallback', message)
+    postProgress(id, {
+      stage: 'fallback',
+      label: `Local model inference failed: ${message}`
+    })
     self.postMessage({ id, type: 'error', error: message, fallback: fallbackResult() } satisfies WorkerResponse)
   }
 }

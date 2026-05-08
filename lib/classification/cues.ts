@@ -66,7 +66,8 @@ const restrictedPatterns = [
 ]
 
 const aggregationPatterns = [
-  /\b(appendix|annex|tracker|matrix|register|dashboard|package|roster|worksheet|board|case file|case files)\b/gi,
+  /\b(appendix|annex|tracker|matrix|register|dashboard|roster|worksheet|board|case file|case files)\b/gi,
+  /\b(?:case|continuity|evidence|information|operational|personal|distribution) package\b/gi,
   /\b(aggregate|aggregation|combined|linked|summary of active cases)\b/gi
 ]
 

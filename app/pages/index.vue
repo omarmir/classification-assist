@@ -297,8 +297,8 @@ onMounted(() => {
       </div>
     </header>
 
-    <main class="px-4 py-8 md:px-6 lg:px-8">
-      <div class="mx-auto max-w-6xl">
+    <main class="py-8">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <section class="no-print mb-6 grid gap-4 lg:grid-cols-[1fr_25rem]">
           <div class="border border-slate-400 bg-white">
             <div class="section-heading">
@@ -343,107 +343,107 @@ onMounted(() => {
           </div>
         </section>
 
-      <div class="no-print grid gap-6 xl:grid-cols-[1.06fr_0.94fr]">
-        <div class="space-y-6">
-          <DocumentDropzone @upload="handleUpload" />
+        <div class="no-print grid gap-6 xl:grid-cols-[1.06fr_0.94fr]">
+          <div class="space-y-6">
+            <DocumentDropzone @upload="handleUpload" />
 
-          <UAlert
-            v-if="parseError"
-            color="error"
-            variant="soft"
-            :title="locale === 'fr' ? 'Échec de l’analyse' : 'Parsing failed'"
-            :description="parseError"
-          />
-
-          <Transition name="fade-rise">
-            <EvidencePane :document="documentResult" :signals="signals" :focused-section-id="focusedSectionId" />
-          </Transition>
-        </div>
-
-        <div class="space-y-6">
-          <QuestionnairePanel v-model="answers" :locale="locale" />
-
-          <div class="flex flex-wrap gap-3">
-            <UButton color="primary" size="lg" :loading="isEnhancing" :disabled="!documentResult" @click="buildRecommendation">
-              {{ locale === 'fr' ? 'Calculer la recommandation' : 'Compute recommendation' }}
-            </UButton>
-            <UButton color="neutral" variant="soft" :loading="isEnhancing" :disabled="!recommendation" @click="enhanceRecommendation">
-              {{ locale === 'fr' ? 'Améliorer avec le modèle local' : 'Enhance with local model' }}
-            </UButton>
-            <UButton color="neutral" variant="soft" :disabled="!report" @click="exportJson">
-              {{ t('exportJson') }}
-            </UButton>
-            <UButton color="neutral" variant="outline" :disabled="!report" @click="window.print()">
-              {{ t('printReport') }}
-            </UButton>
-          </div>
-
-          <Transition name="fade-rise">
-            <RecommendationPanel
-              v-model:override-label="overrideLabel"
-              v-model:override-reason="overrideReason"
-              :locale="locale"
-              :recommendation="recommendation"
-              :model-status="modelStatus"
-              @focus-section="focusSection"
+            <UAlert
+              v-if="parseError"
+              color="error"
+              variant="soft"
+              :title="locale === 'fr' ? 'Échec de l’analyse' : 'Parsing failed'"
+              :description="parseError"
             />
-          </Transition>
-        </div>
-      </div>
 
-      <section v-if="report" class="print-report hidden pt-10">
-        <div class="mx-auto max-w-4xl border border-slate-200 bg-white p-10 shadow-xl">
-          <p class="data-kicker text-slate-500">{{ t('reportSummary') }}</p>
-          <div class="mt-4 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 class="text-3xl font-semibold text-slate-950">{{ report.documentName }}</h2>
-              <p class="mt-2 text-sm text-slate-600">
-                {{ t('reportGenerated') }} {{ new Date(report.generatedAt).toLocaleString(locale === 'fr' ? 'fr-CA' : 'en-CA') }}
-              </p>
-            </div>
-            <div class="border border-amber-200 bg-amber-50 px-5 py-4">
-              <p class="text-xs uppercase tracking-[0.18em] text-amber-800">
-                {{ locale === 'fr' ? 'Niveau final' : 'Final label' }}
-              </p>
-              <p class="mt-1 text-2xl font-semibold text-slate-950">{{ report.recommendation.finalLabel }}</p>
-            </div>
+            <Transition name="fade-rise">
+              <EvidencePane :document="documentResult" :signals="signals" :focused-section-id="focusedSectionId" />
+            </Transition>
           </div>
 
-          <div class="mt-8 grid gap-8 md:grid-cols-2">
-            <section>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">English</h3>
-              <p class="mt-3 text-sm leading-7 text-slate-700">{{ report.modelSummaryEn }}</p>
-              <p class="mt-4 text-sm leading-7 text-slate-700">{{ report.recommendation.rationaleEn }}</p>
-            </section>
-            <section>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Français</h3>
-              <p class="mt-3 text-sm leading-7 text-slate-700">{{ report.modelSummaryFr }}</p>
-              <p class="mt-4 text-sm leading-7 text-slate-700">{{ report.recommendation.rationaleFr }}</p>
-            </section>
-          </div>
+          <div class="space-y-6">
+            <QuestionnairePanel v-model="answers" :locale="locale" />
 
-          <div class="mt-8 grid gap-8 md:grid-cols-2">
-            <section>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {{ locale === 'fr' ? 'Fondements' : 'Decision basis' }}
-              </h3>
-              <ul class="mt-3 space-y-2 text-sm text-slate-700">
-                <li v-for="item in report.recommendation.basis" :key="item">{{ item }}</li>
-              </ul>
-            </section>
-            <section>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {{ locale === 'fr' ? 'Signaux' : 'Signals' }}
-              </h3>
-              <ul class="mt-3 space-y-2 text-sm text-slate-700">
-                <li v-for="signal in report.signals.slice(0, 8)" :key="`${signal.code}-${signal.matchedText}`">
-                  {{ signal.matchedText }} - {{ signal.severityHint }}
-                </li>
-              </ul>
-            </section>
+            <div class="flex flex-wrap gap-3">
+              <UButton color="primary" size="lg" :loading="isEnhancing" :disabled="!documentResult" @click="buildRecommendation">
+                {{ locale === 'fr' ? 'Calculer la recommandation' : 'Compute recommendation' }}
+              </UButton>
+              <UButton color="neutral" variant="soft" :loading="isEnhancing" :disabled="!recommendation" @click="enhanceRecommendation">
+                {{ locale === 'fr' ? 'Améliorer avec le modèle local' : 'Enhance with local model' }}
+              </UButton>
+              <UButton color="neutral" variant="soft" :disabled="!report" @click="exportJson">
+                {{ t('exportJson') }}
+              </UButton>
+              <UButton color="neutral" variant="outline" :disabled="!report" @click="window.print()">
+                {{ t('printReport') }}
+              </UButton>
+            </div>
+
+            <Transition name="fade-rise">
+              <RecommendationPanel
+                v-model:override-label="overrideLabel"
+                v-model:override-reason="overrideReason"
+                :locale="locale"
+                :recommendation="recommendation"
+                :model-status="modelStatus"
+                @focus-section="focusSection"
+              />
+            </Transition>
           </div>
         </div>
-      </section>
+
+        <section v-if="report" class="print-report hidden pt-10">
+          <div class="mx-auto max-w-4xl border border-slate-200 bg-white p-10 shadow-xl">
+            <p class="data-kicker text-slate-500">{{ t('reportSummary') }}</p>
+            <div class="mt-4 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 class="text-3xl font-semibold text-slate-950">{{ report.documentName }}</h2>
+                <p class="mt-2 text-sm text-slate-600">
+                  {{ t('reportGenerated') }} {{ new Date(report.generatedAt).toLocaleString(locale === 'fr' ? 'fr-CA' : 'en-CA') }}
+                </p>
+              </div>
+              <div class="border border-amber-200 bg-amber-50 px-5 py-4">
+                <p class="text-xs uppercase tracking-[0.18em] text-amber-800">
+                  {{ locale === 'fr' ? 'Niveau final' : 'Final label' }}
+                </p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ report.recommendation.finalLabel }}</p>
+              </div>
+            </div>
+
+            <div class="mt-8 grid gap-8 md:grid-cols-2">
+              <section>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">English</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-700">{{ report.modelSummaryEn }}</p>
+                <p class="mt-4 text-sm leading-7 text-slate-700">{{ report.recommendation.rationaleEn }}</p>
+              </section>
+              <section>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Français</h3>
+                <p class="mt-3 text-sm leading-7 text-slate-700">{{ report.modelSummaryFr }}</p>
+                <p class="mt-4 text-sm leading-7 text-slate-700">{{ report.recommendation.rationaleFr }}</p>
+              </section>
+            </div>
+
+            <div class="mt-8 grid gap-8 md:grid-cols-2">
+              <section>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {{ locale === 'fr' ? 'Fondements' : 'Decision basis' }}
+                </h3>
+                <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                  <li v-for="item in report.recommendation.basis" :key="item">{{ item }}</li>
+                </ul>
+              </section>
+              <section>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {{ locale === 'fr' ? 'Signaux' : 'Signals' }}
+                </h3>
+                <ul class="mt-3 space-y-2 text-sm text-slate-700">
+                  <li v-for="signal in report.signals.slice(0, 8)" :key="`${signal.code}-${signal.matchedText}`">
+                    {{ signal.matchedText }} - {{ signal.severityHint }}
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
