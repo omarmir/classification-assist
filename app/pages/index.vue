@@ -24,7 +24,7 @@ import { questionDefinitions } from '~~/lib/classification/rubric'
 const { locale, t } = useI18n()
 const { parse } = useDocxParser()
 const { scan } = useHeuristicScanner()
-const { analyze, warmup, status: modelStatus } = useLocalClassifierModel()
+const { analyze, warmup, status: modelStatus, progress: modelProgress } = useLocalClassifierModel()
 const { recommend } = useClassificationEngine()
 
 const documentResult = ref<DocumentParseResult | null>(null)
@@ -70,6 +70,19 @@ const scanState = computed(() => {
 
   return locale.value === 'fr' ? 'En attente d’un document' : 'Waiting for a document'
 })
+
+const formatBytes = (bytes: number) => {
+  if (!bytes) {
+    return '0 MB'
+  }
+
+  const megabytes = bytes / (1024 * 1024)
+  if (megabytes < 1024) {
+    return `${megabytes.toFixed(1)} MB`
+  }
+
+  return `${(megabytes / 1024).toFixed(2)} GB`
+}
 
 const finalLabel = computed<ClassificationLabel | undefined>(() =>
   overrideLabel.value ? overrideLabel.value : recommendation.value?.recommendedLabel
@@ -223,13 +236,17 @@ watch(
     report.value.recommendation.overrideReason = overrideReason.value
   }
 )
+
+onMounted(() => {
+  warmup()
+})
 </script>
 
 <template>
   <div class="min-h-screen bg-slate-100 text-slate-900">
     <header class="no-print border-t-[14px] border-blue-800 bg-white">
       <div class="border-b border-slate-300">
-        <div class="mx-auto flex max-w-[88rem] flex-col gap-5 px-4 py-7 sm:px-6 lg:px-8">
+        <div class="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-7 sm:px-6 lg:px-8">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-3xl">
               <p class="data-kicker text-slate-500">{{ t('appTitle') }}</p>
@@ -263,7 +280,7 @@ watch(
         </div>
       </div>
       <div class="border-b border-slate-300 bg-slate-50">
-        <div class="mx-auto grid max-w-[88rem] gap-4 px-4 py-4 sm:px-6 md:grid-cols-3 lg:px-8">
+        <div class="mx-auto grid max-w-6xl gap-4 px-4 py-4 sm:px-6 md:grid-cols-3 lg:px-8">
           <div class="border-l-4 border-blue-800 bg-white px-4 py-3">
             <p class="data-kicker text-slate-500">{{ locale === 'fr' ? 'Étape 1' : 'Step 1' }}</p>
             <p class="mt-1 text-sm font-semibold text-slate-950">{{ locale === 'fr' ? 'Téléversement et extraction' : 'Upload and extraction' }}</p>
@@ -281,7 +298,7 @@ watch(
     </header>
 
     <main class="px-4 py-8 md:px-6 lg:px-8">
-      <div class="mx-auto max-w-[88rem]">
+      <div class="mx-auto max-w-6xl">
         <section class="no-print mb-6 grid gap-4 lg:grid-cols-[1fr_25rem]">
           <div class="border border-slate-400 bg-white">
             <div class="section-heading">
@@ -306,13 +323,20 @@ watch(
             </div>
             <div class="space-y-3 px-6 py-5 text-sm text-slate-700">
               <div class="flex items-center justify-between gap-3">
-                <span>{{ modelStatus }}</span>
+                <span>{{ modelProgress.label }}</span>
                 <UBadge :color="modelStatus === 'ready' ? 'success' : modelStatus === 'loading' ? 'warning' : modelStatus === 'fallback' ? 'error' : 'neutral'" variant="subtle">
                   {{ modelStatus === 'ready' ? 'Ready' : modelStatus === 'loading' ? 'Loading' : modelStatus === 'fallback' ? 'Fallback' : 'Pending' }}
                 </UBadge>
               </div>
               <div class="model-progress">
-                <div class="h-full bg-blue-800 transition-all duration-500" :style="{ width: modelStatus === 'ready' ? '100%' : modelStatus === 'loading' ? '62%' : '0%' }" />
+                <div class="h-full bg-blue-800 transition-all duration-500" :style="{ width: `${modelProgress.percent}%` }" />
+              </div>
+              <div class="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+                <span>
+                  {{ formatBytes(modelProgress.loadedBytes) }} /
+                  {{ formatBytes(modelProgress.totalBytes) }}
+                </span>
+                <span v-if="modelProgress.currentFile">{{ modelProgress.currentFile }}</span>
               </div>
               <p>{{ locale === 'fr' ? 'La recommandation initiale reste disponible pendant le chargement.' : 'The initial recommendation remains available while the model loads.' }}</p>
             </div>

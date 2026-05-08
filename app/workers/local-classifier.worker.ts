@@ -1,5 +1,12 @@
 import { env, pipeline } from '@huggingface/transformers'
-import type { AnalysisChunk, ModelAssistResult, QuestionnaireAnswers, SensitivitySignal, SupportedLocale } from '~~/lib/classification/types'
+import type {
+  AnalysisChunk,
+  ModelAssistResult,
+  ModelProgressState,
+  QuestionnaireAnswers,
+  SensitivitySignal,
+  SupportedLocale
+} from '~~/lib/classification/types'
 
 const MODEL_ID = 'SmolLM2-135M-ONNX'
 const SYSTEM_NOTE = [
@@ -25,6 +32,7 @@ type WorkerRequest =
 
 type WorkerResponse =
   | { id: number, type: 'status', status: WorkerStatus, error?: string }
+  | { id: number, type: 'progress', progress: Partial<ModelProgressState> }
   | { id: number, type: 'result', result: ModelAssistResult }
   | { id: number, type: 'error', error: string, fallback: ModelAssistResult }
 
@@ -34,6 +42,19 @@ let runtimeBaseUrl = ''
 
 const postStatus = (id: number, status: WorkerStatus, error?: string) => {
   self.postMessage({ id, type: 'status', status, error } satisfies WorkerResponse)
+}
+
+type ProgressInfo = {
+  status: string
+  file?: string
+  progress?: number
+  loaded?: number
+  total?: number
+  files?: Record<string, { loaded: number; total: number }>
+}
+
+const postProgress = (id: number, progress: Partial<ModelProgressState>) => {
+  self.postMessage({ id, type: 'progress', progress } satisfies WorkerResponse)
 }
 
 const fallbackResult = (): ModelAssistResult => ({
@@ -171,6 +192,15 @@ const ensurePipeline = async (id: number, baseUrl: string) => {
   initializingPipeline = (async () => {
     try {
       postStatus(id, 'loading')
+      postProgress(id, {
+        stage: 'loading',
+        label: 'Starting local model',
+        percent: 0,
+        loadedBytes: 0,
+        totalBytes: 0,
+        currentFile: '',
+        files: {}
+      })
       runtimeBaseUrl = baseUrl.replace(/\/$/, '')
       env.allowRemoteModels = false
       env.allowLocalModels = true
@@ -180,14 +210,55 @@ const ensurePipeline = async (id: number, baseUrl: string) => {
 
       cachedPipeline = await pipeline('text-generation', MODEL_ID, {
         dtype: 'q4',
-        device: 'wasm'
+        device: 'wasm',
+        progress_callback(info: ProgressInfo) {
+          if (info.status === 'progress_total') {
+            postProgress(id, {
+              stage: 'loading',
+              label: 'Loading local model',
+              percent: Math.round(info.progress ?? 0),
+              loadedBytes: info.loaded ?? 0,
+              totalBytes: info.total ?? 0,
+              currentFile: info.file ?? '',
+              files: info.files ?? {}
+            })
+            return
+          }
+
+          if (info.status === 'download' || info.status === 'progress') {
+            postProgress(id, {
+              stage: 'loading',
+              label: 'Loading local model',
+              currentFile: info.file ?? ''
+            })
+            return
+          }
+
+          if (info.status === 'ready') {
+            postProgress(id, {
+              stage: 'ready',
+              label: 'Local model ready',
+              percent: 100
+            })
+          }
+        }
       })
 
       postStatus(id, 'ready')
+      postProgress(id, {
+        stage: 'ready',
+        label: 'Local model ready',
+        percent: 100,
+        currentFile: ''
+      })
       return cachedPipeline
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'model-initialization-failed'
       postStatus(id, 'fallback', message)
+      postProgress(id, {
+        stage: 'fallback',
+        label: 'Local model unavailable'
+      })
       return null
     } finally {
       initializingPipeline = null

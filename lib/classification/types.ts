@@ -1,5 +1,22 @@
 export type SupportedLocale = 'en' | 'fr'
 
+export type ModelProgressStage = 'idle' | 'loading' | 'ready' | 'fallback'
+
+export type ModelProgressFileInfo = {
+  loaded: number
+  total: number
+}
+
+export type ModelProgressState = {
+  stage: ModelProgressStage
+  label: string
+  percent: number
+  loadedBytes: number
+  totalBytes: number
+  currentFile: string
+  files: Record<string, ModelProgressFileInfo>
+}
+
 export type ClassificationLabel =
   | 'Public'
   | 'Protected A'

@@ -1,4 +1,11 @@
-import type { AnalysisChunk, ModelAssistResult, QuestionnaireAnswers, SensitivitySignal, SupportedLocale } from '~~/lib/classification/types'
+import type {
+  AnalysisChunk,
+  ModelAssistResult,
+  ModelProgressState,
+  QuestionnaireAnswers,
+  SensitivitySignal,
+  SupportedLocale
+} from '~~/lib/classification/types'
 import LocalClassifierWorker from '../app/workers/local-classifier.worker?worker&inline'
 
 type WorkerStatus = 'idle' | 'loading' | 'ready' | 'fallback'
@@ -14,11 +21,12 @@ type AnalyzePayload = {
 type AnalyzeInput = Omit<AnalyzePayload, 'baseUrl'>
 
 type WorkerRequest =
-  | { id: number, type: 'warmup' }
+  | { id: number, type: 'warmup', payload: Pick<AnalyzePayload, 'baseUrl'> }
   | { id: number, type: 'analyze', payload: AnalyzePayload }
 
 type WorkerResponse =
   | { id: number, type: 'status', status: WorkerStatus, error?: string }
+  | { id: number, type: 'progress', progress: Partial<ModelProgressState> }
   | { id: number, type: 'result', result: ModelAssistResult }
   | { id: number, type: 'error', error: string, fallback: ModelAssistResult }
 
@@ -46,8 +54,19 @@ const fallbackResult = (): ModelAssistResult => ({
   caveats: ['local-model-unavailable']
 })
 
+const initialProgress = (): ModelProgressState => ({
+  stage: 'idle',
+  label: 'Local model pending',
+  percent: 0,
+  loadedBytes: 0,
+  totalBytes: 0,
+  currentFile: '',
+  files: {}
+})
+
 const createWorker = (
-  onStatus: (status: WorkerStatus, error?: string) => void
+  onStatus: (status: WorkerStatus, error?: string) => void,
+  onProgress: (progress: Partial<ModelProgressState>) => void
 ) => {
   if (!import.meta.client) {
     return null
@@ -64,6 +83,11 @@ const createWorker = (
 
     if (message.type === 'status') {
       onStatus(message.status, message.error)
+      return
+    }
+
+    if (message.type === 'progress') {
+      onProgress(message.progress)
       return
     }
 
@@ -95,14 +119,41 @@ export const useLocalClassifierModel = () => {
   const status = useState<WorkerStatus>('model-status', () => 'idle')
   const error = useState<string | null>('model-error', () => null)
   const warmupStarted = useState<boolean>('model-warmup-started', () => false)
+  const progress = useState<ModelProgressState>('model-progress', initialProgress)
 
   const updateStatus = (nextStatus: WorkerStatus, nextError?: string) => {
     status.value = nextStatus
     error.value = nextError ?? null
+    progress.value.stage = nextStatus
+
+    if (nextStatus === 'ready') {
+      progress.value.label = 'Local model ready'
+      progress.value.percent = 100
+      return
+    }
+
+    if (nextStatus === 'loading') {
+      progress.value.label = progress.value.label === 'Local model pending'
+        ? 'Loading local model'
+        : progress.value.label
+      return
+    }
+
+    if (nextStatus === 'fallback') {
+      progress.value.label = 'Local model unavailable'
+    }
+  }
+
+  const updateProgress = (nextProgress: Partial<ModelProgressState>) => {
+    progress.value = {
+      ...progress.value,
+      ...nextProgress,
+      files: nextProgress.files ?? progress.value.files
+    }
   }
 
   const postMessage = (message: WorkerRequest) => {
-    const worker = createWorker(updateStatus)
+    const worker = createWorker(updateStatus, updateProgress)
 
     if (!worker) {
       updateStatus('fallback', 'worker-unavailable')
@@ -120,6 +171,15 @@ export const useLocalClassifierModel = () => {
 
     warmupStarted.value = true
     const id = ++nextRequestId
+    updateProgress({
+      stage: 'loading',
+      label: 'Starting local model',
+      percent: 0,
+      loadedBytes: 0,
+      totalBytes: 0,
+      currentFile: '',
+      files: {}
+    })
     postMessage({ id, type: 'warmup', payload: { baseUrl: resolveBaseUrl() } })
   }
 
@@ -159,6 +219,7 @@ export const useLocalClassifierModel = () => {
   return {
     status,
     error,
+    progress,
     warmup,
     analyze
   }

@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nuxt dev",
+    "dev": "NITRO_NO_UNIX_SOCKET=1 nuxt dev",
+    "postinstall": "node scripts/patch-nuxt-vite-builder.mjs",
     "build": "nuxt build",
     "generate": "nuxt generate",
     "prepare": "nuxt prepare",

@@ -23,7 +23,7 @@ useSeoMeta({
   <div class="min-h-screen bg-slate-100 text-slate-900">
     <header class="border-t-[14px] border-blue-800 bg-white">
       <div class="border-b border-slate-300">
-        <div class="mx-auto max-w-[88rem] px-4 py-7 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-4 py-7 sm:px-6 lg:px-8">
           <UButton to="/" color="neutral" variant="outline">
             Back to classifier
           </UButton>
@@ -38,7 +38,7 @@ useSeoMeta({
         </div>
       </div>
       <div class="border-b border-slate-300 bg-slate-50">
-        <div class="mx-auto grid max-w-[88rem] gap-4 px-4 py-4 sm:px-6 md:grid-cols-3 lg:px-8">
+        <div class="mx-auto grid max-w-6xl gap-4 px-4 py-4 sm:px-6 md:grid-cols-3 lg:px-8">
           <div class="border-l-4 border-blue-800 bg-white px-4 py-3">
             <p class="data-kicker text-slate-500">Corpus</p>
             <p class="mt-1 text-sm font-semibold text-slate-950">{{ report.totalCases }} cases</p>
@@ -56,7 +56,7 @@ useSeoMeta({
     </header>
 
     <main class="px-4 py-8 md:px-6 lg:px-8">
-      <div class="mx-auto max-w-[88rem] space-y-8">
+      <div class="mx-auto max-w-6xl space-y-8">
         <section class="grid gap-6 xl:grid-cols-[1fr_25rem]">
           <div class="border border-slate-400 bg-white">
             <div class="section-heading">
